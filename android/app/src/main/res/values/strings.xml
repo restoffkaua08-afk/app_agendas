@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Marca Agenda</string>
+    <string name="title_activity_main">Marca Agenda</string>
+    <string name="package_name">com.marca.agenda</string>
+    <string name="custom_url_scheme">com.marca.agenda</string>
+</resources>
