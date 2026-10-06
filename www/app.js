@@ -14,8 +14,10 @@ const state = {
   modal: "",
   error: "",
   busy: false,
-  toast: ""
+  toast: "",
+  theme: "dark"
 };
+try { state.theme = localStorage.getItem("risco-theme") === "light" ? "light" : "dark"; } catch { /* Use the dark default when storage is unavailable. */ }
 
 const labels = { pending: "Aguardando", confirmed: "Confirmado", completed: "Concluído", cancelled: "Cancelado", no_show: "Não compareceu" };
 const nav = [["home", "⌂", "Início"], ["agenda", "◷", "Agenda"], ["reservations", "▤", "Reservas"], ["calendar", "▦", "Calendário"], ["site", "◎", "Meu site"]];
@@ -170,7 +172,7 @@ function siteView() {
 }
 
 function modalView() {
-  if (state.modal === "help") return `<div class="modal-backdrop" data-action="close-modal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title"><div class="modal-head"><h2 id="help-title">Como usar o Agenda</h2><button class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><p>O código recebido conecta este celular ao site certo. Ele é usado uma vez e não precisa ser digitado novamente neste aparelho.</p><p>Novas reservas aparecem em <b>Reservas</b> e <b>Agenda</b>. Você pode confirmar ou cancelar cada pedido. Em <b>Meu site</b>, pause ou reative os serviços que seus clientes podem escolher.</p><p>Para conectar outro celular, gere um novo código em <b>Meu site</b>. Se o código vencer, peça outro à pessoa que preparou seu site.</p><button class="primary-button full" data-action="close-modal">Entendi</button></section></div>`;
+  if (state.modal === "help") return `<div class="modal-backdrop" data-action="close-modal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title"><div class="modal-head"><h2 id="help-title">Como usar o Risco</h2><button class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><p>O código recebido conecta este celular ao site certo. Ele é usado uma vez e não precisa ser digitado novamente neste aparelho.</p><p>Novas reservas aparecem em <b>Reservas</b> e <b>Agenda</b>. Você pode confirmar ou cancelar cada pedido. Em <b>Meu site</b>, pause ou reative os serviços que seus clientes podem escolher.</p><p>Para conectar outro celular, gere um novo código em <b>Meu site</b>. Se o código vencer, peça outro à pessoa que preparou seu site.</p><button class="primary-button full" data-action="close-modal">Entendi</button></section></div>`;
   if (state.modal === "code") return `<div class="modal-backdrop" data-action="close-modal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="code-title"><div class="modal-head"><h2 id="code-title">Conectar outro celular</h2><button class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><p>Envie este código para a pessoa que vai configurar o outro celular. Ele só pode ser usado uma vez e vence em 10 minutos.</p><div class="code-display">${escapeHtml(state.generatedCode)}</div><div class="modal-actions"><button class="secondary-button" data-action="copy-code">Copiar código</button><button class="primary-button" data-action="close-modal">Pronto</button></div></section></div>`;
   if (state.modal === "confirm-disconnect") return `<div class="modal-backdrop" data-action="close-modal"><section class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h2>Desconectar este celular?</h2><button class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><p>Você deixará de ver as reservas neste aparelho. Para voltar, será necessário pedir um novo código ao responsável pelo site.</p><div class="modal-actions"><button class="secondary-button" data-action="close-modal">Manter conectado</button><button class="danger-button" data-action="confirm-disconnect">Desconectar</button></div></section></div>`;
   return "";
@@ -178,13 +180,19 @@ function modalView() {
 
 function connectionView() {
   const busy = state.busy;
-  return `<main class="connection-screen"><div class="connection-top"><span class="brand-mark">A</span> Agenda</div><div class="connection-spacer"></div><div class="connection-hero"><div class="connection-logo">A</div><h1>Seu negócio, em suas mãos</h1><p>Conecte o aplicativo ao site do seu estabelecimento para acompanhar os horários e reservas.</p></div><form class="connect-card" id="connect-form"><label for="pair-code">Código de conexão</label><input class="code-input" id="pair-code" name="code" autocomplete="one-time-code" autocapitalize="characters" maxlength="14" placeholder="XXXX-XXXX-XXXX" required aria-describedby="code-hint"/><p class="input-help" id="code-hint">Digite o código recebido junto com as instruções do seu site. Por segurança, ele só pode ser usado uma vez.</p>${state.error ? `<p class="connection-error" role="alert">${escapeHtml(state.error)}</p>` : ""}<button class="primary-button full" type="submit" ${busy ? "disabled" : ""}>${busy ? '<span class="spinner"></span>Conectando…' : "Conectar meu estabelecimento"}</button></form><button class="help-link" data-action="help">Onde encontro meu código?</button><div class="connection-spacer"></div><p class="connection-foot">Acesso protegido para o responsável pelo estabelecimento</p>${modalView()}</main>`;
+  return `<main class="connection-screen"><div class="connection-top"><span class="connection-brand"><img class="brand-logo" src="logo-risco.jpeg" alt=""/>Risco</span>${themeToggle()}</div><div class="connection-spacer"></div><div class="connection-hero"><img class="connection-logo" src="logo-risco.jpeg" alt="Logo Risco"/><h1>Seu negócio, em suas mãos</h1><p>Conecte o aplicativo ao site do seu estabelecimento para acompanhar os horários e reservas.</p></div><form class="connect-card" id="connect-form"><label for="pair-code">Código de conexão</label><input class="code-input" id="pair-code" name="code" autocomplete="one-time-code" autocapitalize="characters" maxlength="14" placeholder="XXXX-XXXX-XXXX" required aria-describedby="code-hint"/><p class="input-help" id="code-hint">Digite o código recebido junto com as instruções do seu site. Por segurança, ele só pode ser usado uma vez.</p>${state.error ? `<p class="connection-error" role="alert">${escapeHtml(state.error)}</p>` : ""}<button class="primary-button full" type="submit" ${busy ? "disabled" : ""}>${busy ? '<span class="spinner"></span>Conectando…' : "Conectar meu estabelecimento"}</button></form><button class="help-link" data-action="help">Onde encontro meu código?</button><div class="connection-spacer"></div><p class="connection-foot">Acesso protegido para o responsável pelo estabelecimento</p>${modalView()}</main>`;
+}
+
+function themeToggle() {
+  const next = state.theme === "dark" ? "claro" : "escuro";
+  return `<button class="theme-toggle" data-action="toggle-theme" aria-label="Ativar modo ${next}" title="Ativar modo ${next}"><span aria-hidden="true">${state.theme === "dark" ? "☼" : "☾"}</span>${next}</button>`;
 }
 
 function render() {
+  document.documentElement.dataset.theme = state.theme;
   if (!state.session) { root.innerHTML = connectionView(); return; }
   const view = ({ home: homeView, agenda: agendaView, reservations: reservationsView, calendar: calendarView, site: siteView })[state.tab] || homeView;
-  root.innerHTML = `<main class="screen"><header class="topbar"><div class="brand"><span class="brand-mark">A</span> Agenda</div><button class="icon-button" data-action="help" aria-label="Ajuda">?</button></header>${state.error ? `<div class="content"><div class="connection-error" role="alert">${escapeHtml(state.error)} <button class="text-button" data-action="refresh">Tentar novamente</button></div></div>` : ""}${view()}<nav class="bottom-nav" aria-label="Navegação principal">${nav.map(([id, icon, label]) => `<button class="nav-item ${state.tab === id ? "active" : ""}" data-tab="${id}" aria-current="${state.tab === id ? "page" : "false"}"><span>${icon}</span><span>${label}</span></button>`).join("")}</nav>${modalView()}${state.toast ? `<div class="toast" role="status">${escapeHtml(state.toast)}</div>` : ""}</main>`;
+  root.innerHTML = `<main class="screen"><header class="topbar"><div class="brand"><img class="brand-logo" src="logo-risco.jpeg" alt=""/>Risco</div><div class="topbar-actions">${themeToggle()}<button class="icon-button" data-action="help" aria-label="Ajuda">?</button></div></header>${state.error ? `<div class="content"><div class="connection-error" role="alert">${escapeHtml(state.error)} <button class="text-button" data-action="refresh">Tentar novamente</button></div></div>` : ""}${view()}<nav class="bottom-nav" aria-label="Navegação principal">${nav.map(([id, icon, label]) => `<button class="nav-item ${state.tab === id ? "active" : ""}" data-tab="${id}" aria-current="${state.tab === id ? "page" : "false"}"><span>${icon}</span><span>${label}</span></button>`).join("")}</nav>${modalView()}${state.toast ? `<div class="toast" role="status">${escapeHtml(state.toast)}</div>` : ""}</main>`;
 }
 
 function showToast(message) {
@@ -259,6 +267,7 @@ root.addEventListener("click", async (event) => {
   }
   const { action } = button.dataset;
   if (action === "help") { state.modal = "help"; render(); }
+  else if (action === "toggle-theme") { state.theme = state.theme === "dark" ? "light" : "dark"; try { localStorage.setItem("risco-theme", state.theme); } catch { /* Keep the selection for this session. */ } render(); }
   else if (action === "close-modal") { if (event.target === button || button.classList.contains("icon-button") || button.dataset.action === "close-modal") { state.modal = ""; render(); } }
   else if (action === "refresh") await refresh();
   else if (action === "today") { state.date = new Date(); await refresh(); }
