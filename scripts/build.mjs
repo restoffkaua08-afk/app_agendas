@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const webRoot = resolve(appRoot, "www");
-const capacitorRuntime = fileURLToPath(import.meta.resolve("@capacitor/core"));
+const capacitorRuntime = fileURLToPath(import.meta.resolve("@capacitor/core/dist/index.js"));
 const apiBaseUrl = (process.env.MOBILE_API_URL ?? "").replace(/\/+$/, "");
 
 await mkdir(resolve(webRoot, "vendor"), { recursive: true });
