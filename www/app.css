@@ -103,6 +103,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid #7ab5d180; outlin
 .secondary-button { background: #eef3ef; color: var(--forest); }
 .danger-button { background: #fff0ef; color: var(--danger); }
 .full { width: 100%; }
+.demo-entry { margin-top: 18px; text-align: center; }
+.demo-entry p { margin: 9px 8px 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.demo-banner { margin: 16px 18px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--mint); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.demo-banner strong { display: block; font-size: 12px; }
+.demo-banner span { display: block; margin-top: 4px; font-size: 11px; line-height: 1.45; color: var(--muted); }
+.demo-banner button { flex-shrink: 0; }
+.demo-entry button:focus-visible, .demo-banner button:focus-visible { outline: 2px solid var(--forest-2); outline-offset: 4px; }
 .connection-screen { min-height: 100vh; width: min(100%, 520px); margin: auto; background: #fff; display: flex; flex-direction: column; padding: 22px 22px max(24px, env(safe-area-inset-bottom)); }
 .connection-top { display: flex; align-items: center; gap: 10px; color: var(--forest); font-size: 15px; font-weight: 750; }
 .connection-spacer { flex: 1; min-height: 28px; }

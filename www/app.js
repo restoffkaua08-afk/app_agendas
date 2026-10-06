@@ -6,6 +6,7 @@ const root = document.querySelector("#app");
 const apiBase = String(window.AGENDA_CONFIG?.apiBaseUrl ?? "").replace(/\/+$/, "");
 const state = {
   session: null,
+  demo: null,
   tab: "home",
   date: new Date(),
   monthItems: [],
@@ -55,15 +56,24 @@ async function secureSet(value) {
 }
 
 async function clearSession() {
-  try { if (window.Capacitor?.isNativePlatform?.()) await SecureSession.remove(); } catch { /* Clear the screen even if storage is unavailable. */ }
+  try { if (!state.demo && window.Capacitor?.isNativePlatform?.()) await SecureSession.remove(); } catch { /* Clear the screen even if storage is unavailable. */ }
   state.session = null;
+  state.demo = null;
   state.monthItems = [];
   state.services = [];
   state.tab = "home";
+  state.date = new Date();
+  state.filter = "all";
+  state.modal = "";
+  state.generatedCode = "";
+  state.error = "";
+  state.busy = false;
+  state.toast = "";
   render();
 }
 
 async function request(path, options = {}) {
+  if (state.demo) throw new Error("A demonstração não realiza operações reais.");
   if (!apiBase) throw new Error("Este aplicativo ainda está sendo preparado. Fale com a pessoa que lhe entregou o site.");
   const response = await fetch(`${apiBase}${path}`, {
     ...options,
@@ -101,6 +111,13 @@ async function connect(code) {
 
 async function refresh() {
   if (!state.session) return render();
+  if (state.demo) {
+    state.monthItems = demoAppointments(state.date);
+    state.services = state.demo.services;
+    state.error = "";
+    state.busy = false;
+    return render();
+  }
   state.busy = true; state.error = ""; render();
   try {
     const slug = encodeURIComponent(state.session.tenant.slug);
@@ -116,6 +133,56 @@ async function refresh() {
     if (state.session) state.error = error.message || "Não foi possível atualizar as informações.";
   }
   render();
+}
+
+function startDemo() {
+  if (state.busy || state.session) return;
+  state.demo = {
+    months: {},
+    services: [
+      { id: "demo-cut", name: "Corte de cabelo", durationMinutes: 45, priceCents: 5000, active: true },
+      { id: "demo-beard", name: "Barba e acabamento", durationMinutes: 30, priceCents: 3500, active: true },
+      { id: "demo-combo", name: "Corte + barba", durationMinutes: 60, priceCents: 7500, active: true },
+      { id: "demo-care", name: "Hidratação", durationMinutes: 30, priceCents: 4000, active: false }
+    ]
+  };
+  state.session = {
+    tenant: { slug: "demo", name: "Studio Risco · Demonstração", timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+    user: { displayName: "visitante" }
+  };
+  state.date = new Date();
+  state.tab = "home";
+  state.filter = "all";
+  state.modal = "";
+  state.toast = "";
+  refresh();
+}
+
+function demoAppointments(date) {
+  const key = monthKey(date);
+  if (state.demo.months[key]) return state.demo.months[key];
+  const names = ["Alex Souza", "Camila Lima", "Bruno Alves", "Marina Costa", "Rafael Santos", "Juliana Rocha", "Pedro Melo", "Luiza Ferreira"];
+  const staff = ["João", "Bia", "Lucas"];
+  const statuses = ["pending", "confirmed", "completed"];
+  const days = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  const appointments = Array.from({ length: days * 3 }, (_, index) => {
+    const day = Math.floor(index / 3) + 1;
+    const slot = index % 3;
+    const service = state.demo.services[Math.floor(Math.random() * 3)];
+    const startsAt = new Date(date.getFullYear(), date.getMonth(), day, 9 + slot * 3, Math.random() < .5 ? 0 : 30);
+    return {
+      id: `demo-${key}-${index}`,
+      customerName: names[Math.floor(Math.random() * names.length)],
+      customerPhone: "",
+      whatsappOptIn: false,
+      serviceName: service.name,
+      staffName: staff[slot],
+      startsAt: startsAt.toISOString(),
+      status: statuses[slot]
+    };
+  });
+  state.demo.months[key] = appointments;
+  return appointments;
 }
 
 function appointmentCard(item, actions = true) {
@@ -135,7 +202,7 @@ function homeView() {
   const byWeek = Array.from({ length: 5 }, (_, index) => monthItems().filter((item) => Math.floor((Number(inTenantDay(item.startsAt).slice(-2)) - 1) / 7) === index).length);
   const max = Math.max(1, ...byWeek);
   return `<div class="content"><div class="greeting"><div><p class="eyebrow">${dateLabel(new Date(), { weekday: "long", day: "numeric", month: "long" })}</p><h1>Olá, ${escapeHtml(state.session.user.displayName || "tudo bem?")}</h1><div class="business">${escapeHtml(state.session.tenant.name)}</div></div><button class="date-pill" data-action="refresh">↻ Atualizar</button></div>
-    <section class="hero"><p class="hero-label">Agendamentos de hoje</p><p class="hero-number">${today.length}</p><div class="hero-foot"><span class="hero-dot"></span> Sua agenda está conectada</div></section>
+    <section class="hero"><p class="hero-label">Agendamentos de hoje</p><p class="hero-number">${today.length}</p><div class="hero-foot"><span class="hero-dot"></span> ${state.demo ? "Sua agenda de demonstração" : "Sua agenda está conectada"}</div></section>
     <div class="stats"><div class="stat-card"><div class="stat-icon blue">◷</div><div class="stat-value">${pending}</div><div class="stat-label">Aguardando resposta</div></div><div class="stat-card"><div class="stat-icon purple">✓</div><div class="stat-value">${today.filter((item) => item.status === "confirmed").length}</div><div class="stat-label">Confirmados hoje</div></div></div>
     <div class="section-head"><h2>Movimento do mês</h2><button class="text-button" data-tab="calendar">Ver calendário</button></div><div class="card chart">${byWeek.map((count, index) => `<div class="chart-col"><div class="chart-bar ${index === 4 ? "current" : ""}" style="height:${Math.max(7, count / max * 70)}%"></div><span class="chart-label">${index === 4 ? "Agora" : `Sem ${index + 1}`}</span></div>`).join("")}</div>
     <div class="section-head"><h2>Próximos hoje</h2><button class="text-button" data-tab="agenda">Ver agenda</button></div><div class="appointment-list">${today.length ? today.slice(0, 3).map((item) => appointmentCard(item, false)).join("") : empty("Nenhum horário reservado para hoje.")}</div></div>`;
@@ -168,10 +235,11 @@ function calendarView() {
 
 function siteView() {
   const services = state.services.map((service) => `<div class="card service-card"><div class="service-copy"><div class="service-name">${escapeHtml(service.name)}</div><div class="service-detail">${service.durationMinutes} min${service.priceCents ? ` · ${(service.priceCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}` : ""}</div></div><button class="switch ${service.active ? "on" : ""}" role="switch" aria-checked="${service.active}" aria-label="${service.active ? "Pausar" : "Ativar"} ${escapeHtml(service.name)}" data-action="service" data-id="${escapeHtml(service.id)}"></button></div>`).join("");
-  return `<div class="content"><div class="page-title"><h1>Meu site</h1><p>Controle quais serviços aparecem para seus clientes.</p></div><div class="card settings-card"><h3>${escapeHtml(state.session.tenant.name)} está conectado</h3><p>Este celular acompanha apenas o estabelecimento vinculado a ele. Para usar outro site, desconecte e insira o novo código.</p></div><div class="section-head"><h2>Serviços publicados</h2></div><div class="appointment-list">${services || empty("Não há serviços cadastrados neste site.")}</div><div class="section-head"><h2>Conexão</h2></div><button class="secondary-button full" data-action="new-code">Conectar outro celular</button><button class="danger-button full" style="margin-top:10px" data-action="disconnect">Desconectar este celular</button></div>`;
+  return `<div class="content"><div class="page-title"><h1>Meu site</h1><p>Controle quais serviços aparecem para seus clientes.</p></div><div class="card settings-card"><h3>${escapeHtml(state.session.tenant.name)}${state.demo ? "" : " está conectado"}</h3><p>${state.demo ? "Explore os serviços e simule alterações. Nenhum site real é modificado; os dados são descartados ao sair ou recarregar a página." : "Este celular acompanha apenas o estabelecimento vinculado a ele. Para usar outro site, desconecte e insira o novo código."}</p></div><div class="section-head"><h2>Serviços publicados</h2></div><div class="appointment-list">${services || empty("Não há serviços cadastrados neste site.")}</div><div class="section-head"><h2>Conexão</h2></div><button class="secondary-button full" data-action="new-code">${state.demo ? "Simular código de conexão" : "Conectar outro celular"}</button><button class="danger-button full" style="margin-top:10px" data-action="${state.demo ? "exit-demo" : "disconnect"}">${state.demo ? "Sair da demonstração" : "Desconectar este celular"}</button></div>`;
 }
 
 function modalView() {
+  if (state.modal === "demo-code") return `<div class="modal-backdrop" data-action="close-modal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="demo-code-title"><div class="modal-head"><h2 id="demo-code-title">Conexão de exemplo</h2><button class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><p>Em uma conexão real, você gera aqui um código temporário para vincular outro celular ao estabelecimento.</p><div class="code-display">DEMO-XXXX-XXXX</div><p>Este código é fictício e não conecta aparelhos. Nenhuma conexão real foi criada.</p><button class="primary-button full" data-action="close-modal">Entendi</button></section></div>`;
   if (state.modal === "help") return `<div class="modal-backdrop" data-action="close-modal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title"><div class="modal-head"><h2 id="help-title">Como usar o Risco</h2><button class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><p>O código recebido conecta este celular ao site certo. Ele é usado uma vez e não precisa ser digitado novamente neste aparelho.</p><p>Novas reservas aparecem em <b>Reservas</b> e <b>Agenda</b>. Você pode confirmar ou cancelar cada pedido. Em <b>Meu site</b>, pause ou reative os serviços que seus clientes podem escolher.</p><p>Para conectar outro celular, gere um novo código em <b>Meu site</b>. Se o código vencer, peça outro à pessoa que preparou seu site.</p><button class="primary-button full" data-action="close-modal">Entendi</button></section></div>`;
   if (state.modal === "code") return `<div class="modal-backdrop" data-action="close-modal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="code-title"><div class="modal-head"><h2 id="code-title">Conectar outro celular</h2><button class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><p>Envie este código para a pessoa que vai configurar o outro celular. Ele só pode ser usado uma vez e vence em 10 minutos.</p><div class="code-display">${escapeHtml(state.generatedCode)}</div><div class="modal-actions"><button class="secondary-button" data-action="copy-code">Copiar código</button><button class="primary-button" data-action="close-modal">Pronto</button></div></section></div>`;
   if (state.modal === "confirm-disconnect") return `<div class="modal-backdrop" data-action="close-modal"><section class="modal" role="dialog" aria-modal="true"><div class="modal-head"><h2>Desconectar este celular?</h2><button class="icon-button" data-action="close-modal" aria-label="Fechar">×</button></div><p>Você deixará de ver as reservas neste aparelho. Para voltar, será necessário pedir um novo código ao responsável pelo site.</p><div class="modal-actions"><button class="secondary-button" data-action="close-modal">Manter conectado</button><button class="danger-button" data-action="confirm-disconnect">Desconectar</button></div></section></div>`;
@@ -180,7 +248,7 @@ function modalView() {
 
 function connectionView() {
   const busy = state.busy;
-  return `<main class="connection-screen"><div class="connection-top"><span class="connection-brand"><img class="brand-logo" src="logo-risco.jpeg" alt=""/>Risco</span>${themeToggle()}</div><div class="connection-spacer"></div><div class="connection-hero"><img class="connection-logo" src="logo-risco.jpeg" alt="Logo Risco"/><h1>Seu negócio, em suas mãos</h1><p>Conecte o aplicativo ao site do seu estabelecimento para acompanhar os horários e reservas.</p></div><form class="connect-card" id="connect-form"><label for="pair-code">Código de conexão</label><input class="code-input" id="pair-code" name="code" autocomplete="one-time-code" autocapitalize="characters" maxlength="14" placeholder="XXXX-XXXX-XXXX" required aria-describedby="code-hint"/><p class="input-help" id="code-hint">Digite o código recebido junto com as instruções do seu site. Por segurança, ele só pode ser usado uma vez.</p>${state.error ? `<p class="connection-error" role="alert">${escapeHtml(state.error)}</p>` : ""}<button class="primary-button full" type="submit" ${busy ? "disabled" : ""}>${busy ? '<span class="spinner"></span>Conectando…' : "Conectar meu estabelecimento"}</button></form><button class="help-link" data-action="help">Onde encontro meu código?</button><div class="connection-spacer"></div><p class="connection-foot">Acesso protegido para o responsável pelo estabelecimento</p>${modalView()}</main>`;
+  return `<main class="connection-screen"><div class="connection-top"><span class="connection-brand"><img class="brand-logo" src="logo-risco.jpeg" alt=""/>Risco</span>${themeToggle()}</div><div class="connection-spacer"></div><div class="connection-hero"><img class="connection-logo" src="logo-risco.jpeg" alt="Logo Risco"/><h1>Seu negócio, em suas mãos</h1><p>Conecte o aplicativo ao site do seu estabelecimento para acompanhar os horários e reservas.</p></div><form class="connect-card" id="connect-form"><label for="pair-code">Código de conexão</label><input class="code-input" id="pair-code" name="code" autocomplete="one-time-code" autocapitalize="characters" maxlength="14" placeholder="XXXX-XXXX-XXXX" required aria-describedby="code-hint"/><p class="input-help" id="code-hint">Digite o código recebido junto com as instruções do seu site. Por segurança, ele só pode ser usado uma vez.</p>${state.error ? `<p class="connection-error" role="alert">${escapeHtml(state.error)}</p>` : ""}<button class="primary-button full" type="submit" ${busy ? "disabled" : ""}>${busy ? '<span class="spinner"></span>Conectando…' : "Conectar meu estabelecimento"}</button></form><div class="demo-entry"><button class="secondary-button full" type="button" data-action="start-demo" aria-describedby="demo-hint" ${busy ? "disabled" : ""}>Experimentar demonstração grátis</button><p id="demo-hint">Sem código, cadastro ou conexão real. Explore o app com horários e clientes fictícios.</p></div><button class="help-link" data-action="help">Onde encontro meu código?</button><div class="connection-spacer"></div><p class="connection-foot">Acesso protegido para o responsável pelo estabelecimento</p>${modalView()}</main>`;
 }
 
 function themeToggle() {
@@ -192,7 +260,7 @@ function render() {
   document.documentElement.dataset.theme = state.theme;
   if (!state.session) { root.innerHTML = connectionView(); return; }
   const view = ({ home: homeView, agenda: agendaView, reservations: reservationsView, calendar: calendarView, site: siteView })[state.tab] || homeView;
-  root.innerHTML = `<main class="screen"><header class="topbar"><div class="brand"><img class="brand-logo" src="logo-risco.jpeg" alt=""/>Risco</div><div class="topbar-actions">${themeToggle()}<button class="icon-button" data-action="help" aria-label="Ajuda">?</button></div></header>${state.error ? `<div class="content"><div class="connection-error" role="alert">${escapeHtml(state.error)} <button class="text-button" data-action="refresh">Tentar novamente</button></div></div>` : ""}${view()}<nav class="bottom-nav" aria-label="Navegação principal">${nav.map(([id, icon, label]) => `<button class="nav-item ${state.tab === id ? "active" : ""}" data-tab="${id}" aria-current="${state.tab === id ? "page" : "false"}"><span>${icon}</span><span>${label}</span></button>`).join("")}</nav>${modalView()}${state.toast ? `<div class="toast" role="status">${escapeHtml(state.toast)}</div>` : ""}</main>`;
+  root.innerHTML = `<main class="screen"><header class="topbar"><div class="brand"><img class="brand-logo" src="logo-risco.jpeg" alt=""/>Risco</div><div class="topbar-actions">${themeToggle()}<button class="icon-button" data-action="help" aria-label="Ajuda">?</button></div></header>${state.demo ? `<aside class="demo-banner" aria-label="Modo demonstração"><div><strong>Demonstração · Dados fictícios</strong><span>Teste à vontade. Nada é enviado ou salvo.</span></div><button class="secondary-button" data-action="exit-demo">Sair</button></aside>` : ""}${state.error ? `<div class="content"><div class="connection-error" role="alert">${escapeHtml(state.error)} <button class="text-button" data-action="refresh">Tentar novamente</button></div></div>` : ""}${view()}<nav class="bottom-nav" aria-label="Navegação principal">${nav.map(([id, icon, label]) => `<button class="nav-item ${state.tab === id ? "active" : ""}" data-tab="${id}" aria-current="${state.tab === id ? "page" : "false"}"><span>${icon}</span><span>${label}</span></button>`).join("")}</nav>${modalView()}${state.toast ? `<div class="toast" role="status">${escapeHtml(state.toast)}</div>` : ""}</main>`;
 }
 
 function showToast(message) {
@@ -202,6 +270,12 @@ function showToast(message) {
 
 async function updateStatus(id, status) {
   const appointment = monthItems().find((item) => item.id === id);
+  if (state.demo) {
+    if (!appointment || !labels[status]) return;
+    appointment.status = status;
+    showToast("Reserva atualizada na demonstração. Nenhuma mensagem foi enviada.");
+    return;
+  }
   try {
     await request(`/v1/owner/${encodeURIComponent(state.session.tenant.slug)}/appointments/${encodeURIComponent(id)}`, { method: "PATCH", body: { status } });
     await refresh();
@@ -222,6 +296,11 @@ async function updateStatus(id, status) {
 async function toggleService(id) {
   const service = state.services.find((item) => item.id === id);
   if (!service) return;
+  if (state.demo) {
+    service.active = !service.active;
+    showToast(service.active ? "Serviço ativado na demonstração." : "Serviço pausado na demonstração.");
+    return;
+  }
   try {
     await request(`/v1/owner/${encodeURIComponent(state.session.tenant.slug)}/services/${encodeURIComponent(id)}`, {
       method: "PUT",
@@ -233,6 +312,7 @@ async function toggleService(id) {
 }
 
 async function generateCode() {
+  if (state.demo) { state.modal = "demo-code"; render(); return; }
   try {
     const result = await request(`/v1/owner/${encodeURIComponent(state.session.tenant.slug)}/mobile-pairings`, { method: "POST" });
     state.generatedCode = result.code;
@@ -266,7 +346,9 @@ root.addEventListener("click", async (event) => {
     return;
   }
   const { action } = button.dataset;
-  if (action === "help") { state.modal = "help"; render(); }
+  if (action === "start-demo") startDemo();
+  else if (action === "exit-demo") { if (state.demo) await clearSession(); }
+  else if (action === "help") { state.modal = "help"; render(); }
   else if (action === "toggle-theme") { state.theme = state.theme === "dark" ? "light" : "dark"; try { localStorage.setItem("risco-theme", state.theme); } catch { /* Keep the selection for this session. */ } render(); }
   else if (action === "close-modal") { if (event.target === button || button.classList.contains("icon-button") || button.dataset.action === "close-modal") { state.modal = ""; render(); } }
   else if (action === "refresh") await refresh();

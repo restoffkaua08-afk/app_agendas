@@ -6,6 +6,8 @@ App universal para o responsável acompanhar reservas e controlar os serviços p
 
 Este repositório usa `npm run build` e publica `www`. Configure `MOBILE_API_URL` nas variáveis do Netlify quando a API HTTPS estiver implantada. Até lá, a interface abre, mas não conecta a um estabelecimento.
 
+O botão **Experimentar demonstração grátis** permite explorar todas as abas sem código, cadastro ou API. A demonstração gera horários, clientes e serviços fictícios, permite simular alterações de reservas e serviços e apresenta um exemplo de código de conexão. Não envia mensagens, não altera estabelecimentos reais e não salva sessões ou dados: ao sair ou recarregar a página, a simulação é descartada.
+
 ## Gerar APK nativo
 
 ```powershell
